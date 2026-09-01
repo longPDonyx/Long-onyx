@@ -1,0 +1,488 @@
+-- =================================================================
+-- LONGPD ONYX HUB - BANANA HUB STYLE (FULL ULTIMATE EDITION)
+-- Features: Sea 1/2/3, Auto Farm Level, Quests, Weapons, Stats,
+--           Mythic Swords, Raid V4, Sea Events, Teleports, Shop, Misc
+-- Style: Classic Yellow-Dark Theme (Banana Hub UI Format)
+-- =================================================================
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- Cleanup UI cũ để tránh trùng lặp
+if CoreGui:FindFirstChild("longPDoonyxBananaUI") then CoreGui.longPDoonyxBananaUI:Destroy() end
+if CoreGui:FindFirstChild("longPDBananaToggle") then CoreGui.longPDBananaToggle:Destroy() end
+
+-- ================================================
+-- SYSTEM CONFIG & STATES
+-- ================================================
+_G.AutoFarmLevel = false
+_G.SelectWeapon = "Melee" -- "Melee", "Sword", "Fruit"
+_G.AutoFarmBone = false
+_G.AutoRandomBone = false
+_G.AutoSoulReaper = false
+_G.AutoCakePrince = false
+_G.AutoDoughKing = false
+_G.AutoYama = false
+_G.AutoTushita = false
+_G.AutoFarmMaterials = false
+_G.AutoMasteryFruit = false
+_G.SelectedMasteryIsland = "Thái Dương"
+
+-- Auto Stats Config
+_G.AutoStatsMelee = false
+_G.AutoStatsDefense = false
+_G.AutoStatsSword = false
+_G.AutoStatsGun = false
+_G.AutoStatsFruit = false
+
+-- Extra Modules
+_G.AutoRaidV4 = false
+_G.AutoSeaEvent = false
+_G.AutoDragonEvent = false
+_G.WalkOnWater = false
+_G.TweenSpeed = 235
+
+-- Anti-AFK Protection
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+
+-- Safe Flight Engine (Tween System)
+local currentTween = nil
+local function TweenTo(targetCFrame)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+        local hrp = char.HumanoidRootPart
+        local dist = (hrp.Position - targetCFrame.Position).Magnitude
+        if dist < 15 then 
+            hrp.CFrame = targetCFrame 
+            if currentTween then currentTween:Cancel() end
+            return 
+        end
+        local tweenInfo = TweenInfo.new(dist / _G.TweenSpeed, Enum.EasingStyle.Linear)
+        if currentTween then currentTween:Cancel() end
+        currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+        currentTween:Play()
+    end
+end
+
+-- Anti-Fall & NoClip & Walk on Water Engine
+RunService.Stepped:Connect(function()
+    if LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+        if LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local bv = LocalPlayer.Character.HumanoidRootPart:FindFirstChild("OnyxFlight")
+            if not bv then
+                bv = Instance.new("BodyVelocity")
+                bv.Name = "OnyxFlight"
+                bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                bv.Velocity = Vector3.new(0, 0, 0)
+                bv.Parent = LocalPlayer.Character.HumanoidRootPart
+            end
+        end
+    end
+    -- Walk On Water Logic
+    if _G.WalkOnWater and workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Water") then
+        workspace.Map.Water.CanCollide = true
+    end
+end)
+
+-- Fast Attack Engine
+local function FastAttack()
+    VirtualUser:Button1Down(Vector2.new(500, 500))
+    VirtualUser:Button1Up(Vector2.new(500, 500))
+end
+
+-- Equip Weapon Helper
+local function EquipWeapon(type)
+    local backpack = LocalPlayer.Backpack
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            if type == "Melee" and item.ToolTip == "Melee" then
+                char.Humanoid:EquipTool(item)
+            elseif type == "Sword" and item.ToolTip == "Sword" then
+                char.Humanoid:EquipTool(item)
+            elseif type == "Fruit" and item.ToolTip == "Blox Fruit" then
+                char.Humanoid:EquipTool(item)
+            end
+        end
+    end
+end
+
+-- Level Check & Quest Helper
+local function GetQuestData()
+    local lvl = LocalPlayer.Data.Level.Value
+    -- Ví dụ dữ liệu Quest rút gọn tự động nhận diện Sea
+    if lvl < 10 then
+        return "BanditQuest1", 1, "Bandit", CFrame.new(1059, 16, 1548)
+    elseif lvl < 15 then
+        return "JungleQuest", 1, "Monkey", CFrame.new(-1600, 36, 150)
+    else
+        return "TownQuest", 1, "Pirate", CFrame.new(-1140, 4, 3820)
+    end
+end
+
+-- ================================================
+-- SYSTEM LOGIC THỰC THI (MAIN LOOPS)
+-- ================================================
+task.spawn(function()
+    while task.wait(0.1) do
+        pcall(function()
+            -- 1. Auto Farm Level & Quest
+            if _G.AutoFarmLevel then
+                EquipWeapon(_G.SelectWeapon)
+                local qName, qNum, mName, mCFrame = GetQuestData()
+                if not LocalPlayer.PlayerGui.Main.Quest.Visible then
+                    TweenTo(mCFrame)
+                    CommF:InvokeServer("StartQuest", qName, qNum)
+                else
+                    local mob = workspace.Enemies:FindFirstChild(mName)
+                    if mob and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
+                        TweenTo(mob.HumanoidRootPart.CFrame * CFrame.new(0, 10, 0))
+                        FastAttack()
+                    else
+                        TweenTo(mCFrame)
+                    end
+                end
+            end
+
+            -- 2. Auto Soul Reaper
+            if _G.AutoSoulReaper then
+                local reaper = workspace.Enemies:FindFirstChild("Soul Reaper")
+                if reaper and reaper:FindFirstChild("HumanoidRootPart") and reaper.Humanoid.Health > 0 then
+                    TweenTo(reaper.HumanoidRootPart.CFrame * CFrame.new(0, 11, 0))
+                    FastAttack()
+                end
+            end
+
+            -- 3. Auto Farm Bone
+            if _G.AutoFarmBone then
+                local boneMob = workspace.Enemies:FindFirstChild("Reborn Skeleton") or workspace.Enemies:FindFirstChild("Living Zombie") or workspace.Enemies:FindFirstChild("Demonic Soul") or workspace.Enemies:FindFirstChild("Posessed Mummy")
+                if boneMob and boneMob:FindFirstChild("HumanoidRootPart") and boneMob.Humanoid.Health > 0 then
+                    TweenTo(boneMob.HumanoidRootPart.CFrame * CFrame.new(0, 11, 0))
+                    FastAttack()
+                else
+                    TweenTo(CFrame.new(-9500, 170, 6000))
+                end
+            end
+
+            -- 4. Auto Random Bone
+            if _G.AutoRandomBone then
+                CommF:InvokeServer("Bones", "Buy", 1, 1)
+                task.wait(1)
+            end
+
+            -- 5. Auto Cake Prince & Dough King
+            if _G.AutoCakePrince or _G.AutoDoughKing then
+                local boss = workspace.Enemies:FindFirstChild("Cake Prince") or workspace.Enemies:FindFirstChild("Dough King")
+                if boss and boss:FindFirstChild("HumanoidRootPart") and boss.Humanoid.Health > 0 then
+                    TweenTo(boss.HumanoidRootPart.CFrame * CFrame.new(0, 12, 0))
+                    FastAttack()
+                else
+                    local cakeMob = workspace.Enemies:FindFirstChild("Cookie Crafter") or workspace.Enemies:FindFirstChild("Cake Guard") or workspace.Enemies:FindFirstChild("Baking Staff")
+                    if cakeMob and cakeMob:FindFirstChild("HumanoidRootPart") and cakeMob.Humanoid.Health > 0 then
+                        TweenTo(cakeMob.HumanoidRootPart.CFrame * CFrame.new(0, 11, 0))
+                        FastAttack()
+                    else
+                        TweenTo(CFrame.new(-2100, 70, -12200))
+                    end
+                end
+            end
+
+            -- 6. Auto Yama
+            if _G.AutoYama then
+                local eliteKilled = CommF:InvokeServer("Elites", "Progress") or 0
+                if tonumber(eliteKilled) >= 30 then
+                    TweenTo(CFrame.new(-5256, 15, 9305))
+                    task.wait(1)
+                    if workspace.Map:FindFirstChild("Waterfall") then
+                        fireclickdetector(workspace.Map.Waterfall.Secretdoor.Yama.ClickDetector)
+                    end
+                else
+                    local elite = workspace.Enemies:FindFirstChild("Deandre") or workspace.Enemies:FindFirstChild("Diablo") or workspace.Enemies:FindFirstChild("Urban")
+                    if elite and elite:FindFirstChild("HumanoidRootPart") then
+                        TweenTo(elite.HumanoidRootPart.CFrame * CFrame.new(0, 10, 0))
+                        FastAttack()
+                    end
+                end
+            end
+
+            -- 7. Auto Tushita
+            if _G.AutoTushita then
+                local longma = workspace.Enemies:FindFirstChild("Longma")
+                if longma and longma:FindFirstChild("HumanoidRootPart") and longma.Humanoid.Health > 0 then
+                    TweenTo(longma.HumanoidRootPart.CFrame * CFrame.new(0, 10, 0))
+                    FastAttack()
+                else
+                    local torchPositions = {
+                        CFrame.new(-13480, 330, -7930), CFrame.new(-13150, 390, -7720),
+                        CFrame.new(-12800, 510, -7100), CFrame.new(-12550, 430, -6100),
+                        CFrame.new(-12130, 340, -6480)
+                    }
+                    for _, pos in ipairs(torchPositions) do
+                        TweenTo(pos)
+                        task.wait(0.8)
+                    end
+                    TweenTo(CFrame.new(-5030, 315, -9500))
+                end
+            end
+        end)
+    end
+end)
+
+-- Auto Stats Loop
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            if _G.AutoStatsMelee then CommF:InvokeServer("AddPoint", "Melee", 3) end
+            if _G.AutoStatsDefense then CommF:InvokeServer("AddPoint", "Defense", 3) end
+            if _G.AutoStatsSword then CommF:InvokeServer("AddPoint", "Sword", 3) end
+            if _G.AutoStatsGun then CommF:InvokeServer("AddPoint", "Gun", 3) end
+            if _G.AutoStatsFruit then CommF:InvokeServer("AddPoint", "Demon Fruit", 3) end
+        end)
+    end
+end)
+
+-- ================================================
+-- BANANA HUB UI DESIGN ENGINE (YELLOW & DARK THEME)
+-- ================================================
+local BananaGui = Instance.new("ScreenGui", CoreGui)
+BananaGui.Name = "longPDoonyxBananaUI"
+
+local MainFrame = Instance.new("Frame", BananaGui)
+MainFrame.Name = "MainFrame"
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+MainFrame.Position = UDim2.new(0.2, 0, 0.15, 0)
+MainFrame.Size = UDim2.new(0, 600, 0, 400)
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Thickness = 2
+MainStroke.Color = Color3.fromRGB(255, 215, 0)
+
+-- Header Bar
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, 0, 45)
+Header.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
+
+local TitleText = Instance.new("TextLabel", Header)
+TitleText.Text = " BANANA HUB | longPDonyx Ultimate Edition"
+TitleText.Size = UDim2.new(1, 0, 1, 0)
+TitleText.TextColor3 = Color3.fromRGB(255, 215, 0)
+TitleText.Font = Enum.Font.GothamBold
+TitleText.TextSize = 15
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Sidebar Tabs Container
+local Sidebar = Instance.new("Frame", MainFrame)
+Sidebar.Position = UDim2.new(0, 8, 0, 52)
+Sidebar.Size = UDim2.new(0, 140, 1, -60)
+Sidebar.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 8)
+
+local TabListLayout = Instance.new("UIListLayout", Sidebar)
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 4)
+
+-- Content Display Area
+local ContentArea = Instance.new("Frame", MainFrame)
+ContentArea.Position = UDim2.new(0, 154, 0, 52)
+ContentArea.Size = UDim2.new(1, -162, 1, -60)
+ContentArea.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+Instance.new("UICorner", ContentArea).CornerRadius = UDim.new(0, 8)
+
+-- Toggle Circle Icon Button
+local ToggleGui = Instance.new("ScreenGui", CoreGui)
+ToggleGui.Name = "longPDBananaToggle"
+
+local ToggleBtn = Instance.new("TextButton", ToggleGui)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ToggleBtn.Position = UDim2.new(0.02, 0, 0.2, 0)
+ToggleBtn.Size = UDim2.new(0, 60, 0, 60)
+ToggleBtn.Text = "BANANA\nHUB"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 10
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+local ToggleStroke = Instance.new("UIStroke", ToggleBtn)
+ToggleStroke.Thickness = 2
+ToggleStroke.Color = Color3.fromRGB(255, 215, 0)
+
+ToggleBtn.MouseButton1Click:Connect(function() 
+    MainFrame.Visible = not MainFrame.Visible 
+end)
+
+-- UI Builder Helpers
+local Tabs = {}
+local function CreateTab(name)
+    local TabBtn = Instance.new("TextButton", Sidebar)
+    TabBtn.Size = UDim2.new(1, 0, 0, 30)
+    TabBtn.BackgroundTransparency = 1
+    TabBtn.Text = "  " .. name
+    TabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    TabBtn.Font = Enum.Font.GothamMedium
+    TabBtn.TextSize = 11
+    TabBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+    local PageScroll = Instance.new("ScrollingFrame", ContentArea)
+    PageScroll.Size = UDim2.new(1, -10, 1, -10)
+    PageScroll.Position = UDim2.new(0, 5, 0, 5)
+    PageScroll.BackgroundTransparency = 1
+    PageScroll.Visible = false
+    PageScroll.ScrollBarThickness = 3
+    PageScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0)
+
+    local PageList = Instance.new("UIListLayout", PageScroll)
+    PageList.SortOrder = Enum.SortOrder.LayoutOrder
+    PageList.Padding = UDim.new(0, 6)
+
+    TabBtn.MouseButton1Click:Connect(function()
+        for _, tab in pairs(Tabs) do
+            tab.Page.Visible = false
+            tab.Btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+        end
+        PageScroll.Visible = true
+        TabBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+    end)
+
+    local Elements = {}
+
+    function Elements:AddStatus(title, updateFunc)
+        local Frame = Instance.new("Frame", PageScroll)
+        Frame.Size = UDim2.new(1, 0, 0, 30)
+        Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 5)
+
+        local Text = Instance.new("TextLabel", Frame)
+        Text.Size = UDim2.new(1, 0, 1, 0)
+        Text.Position = UDim2.new(0, 10, 0, 0)
+        Text.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Text.Font = Enum.Font.GothamMedium
+        Text.TextSize = 11
+        Text.TextXAlignment = Enum.TextXAlignment.Left
+        Text.BackgroundTransparency = 1
+
+        task.spawn(function()
+            while task.wait(0.8) do
+                pcall(function()
+                    Text.Text = title .. ": " .. tostring(updateFunc())
+                end)
+            end
+        end)
+    end
+
+    function Elements:AddToggle(text, callback)
+        local Frame = Instance.new("Frame", PageScroll)
+        Frame.Size = UDim2.new(1, 0, 0, 32)
+        Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 5)
+
+        local Label = Instance.new("TextLabel", Frame)
+        Label.Text = "  " .. text
+        Label.Size = UDim2.new(0.7, 0, 1, 0)
+        Label.TextColor3 = Color3.fromRGB(240, 240, 240)
+        Label.Font = Enum.Font.Gotham
+        Label.TextSize = 11
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.BackgroundTransparency = 1
+
+        local Btn = Instance.new("TextButton", Frame)
+        Btn.Position = UDim2.new(0.78, 0, 0.15, 0)
+        Btn.Size = UDim2.new(0.18, 0, 0.7, 0)
+        Btn.Font = Enum.Font.GothamBold
+        Btn.TextSize = 10
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+
+        local state = false
+        local function UpdateState()
+            Btn.Text = state and "ON" or "OFF"
+            Btn.BackgroundColor3 = state and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(40, 40, 40)
+            Btn.TextColor3 = state and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(180, 180, 180)
+        end
+        UpdateState()
+
+        Btn.MouseButton1Click:Connect(function()
+            state = not state
+            UpdateState()
+            callback(state)
+        end)
+    end
+
+    function Elements:AddButton(text, callback)
+        local Btn = Instance.new("TextButton", PageScroll)
+        Btn.Size = UDim2.new(1, 0, 0, 32)
+        Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Btn.Text = text
+        Btn.TextColor3 = Color3.fromRGB(255, 215, 0)
+        Btn.Font = Enum.Font.GothamBold
+        Btn.TextSize = 11
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 5)
+
+        Btn.MouseButton1Click:Connect(callback)
+    end
+
+    table.insert(Tabs, {Btn = TabBtn, Page = PageScroll})
+    if #Tabs == 1 then
+        PageScroll.Visible = true
+        TabBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+    end
+
+    return Elements
+end
+
+-- ================================================
+-- KHỞI TẠO TẤT CẢ TABS & CHỨC NĂNG
+-- ================================================
+
+-- Tab 1: Status Check
+local TabStatus = CreateTab("Status Check")
+TabStatus:AddStatus("Status Level Hiện Tại", function() return LocalPlayer.Data.Level.Value end)
+TabStatus:AddStatus("Status Elite Killed", function() return (CommF:InvokeServer("Elites", "Progress") or 0) .. " / 30" end)
+TabStatus:AddStatus("Status Elite Spawned", function()
+    return (workspace.Enemies:FindFirstChild("Deandre") or workspace.Enemies:FindFirstChild("Diablo") or workspace.Enemies:FindFirstChild("Urban")) and "✅" or "❌"
+end)
+TabStatus:AddStatus("Status Bones Owned", function()
+    local bone = LocalPlayer.Backpack:FindFirstChild("Bones") or LocalPlayer.Character:FindFirstChild("Bones")
+    return bone and (bone.Value .. " ✅") or "0 ❌"
+end)
+TabStatus:AddStatus("Status Hallow Essence", function()
+    return (LocalPlayer.Backpack:FindFirstChild("Hallow Essence") or LocalPlayer.Character:FindFirstChild("Hallow Essence")) and "✅" or "❌"
+end)
+TabStatus:AddStatus("Status Cake Kills", function() return (CommF:InvokeServer("CakePrinceSpawner", "Progress") or "0") .. " / 500" end)
+
+-- Tab 2: Main Farm
+local TabFarm = CreateTab("Main Farm")
+TabFarm:AddToggle("Auto Farm Level", function(v) _G.AutoFarmLevel = v end)
+TabFarm:AddButton("Vũ Khí: Melee", function() _G.SelectWeapon = "Melee" end)
+TabFarm:AddButton("Vũ Khí: Sword", function() _G.SelectWeapon = "Sword" end)
+TabFarm:AddButton("Vũ Khí: M1 Fruit", function() _G.SelectWeapon = "Fruit" end)
+TabFarm:AddToggle("Auto Farm Materials", function(v) _G.AutoFarmMaterials = v end)
+TabFarm:AddToggle("Auto Farm Mastery Fruit", function(v) _G.AutoMasteryFruit = v end)
+
+-- Tab 3: Haunted Castle & Bones
+local TabHaunted = CreateTab("Haunted Castle")
+TabHaunted:AddToggle("Auto Farm Bones", function(v) _G.AutoFarmBone = v end)
+TabHaunted:AddToggle("Auto Random Bone (Roll Item)", function(v) _G.AutoRandomBone = v end)
+TabHaunted:AddToggle("Auto Soul Reaper Boss", function(v) _G.AutoSoulReaper = v end)
+
+-- Tab 4: Cake & Dough King
+local TabCake = CreateTab("Cake & Dough King")
+TabCake:AddToggle("Auto Cake Prince", functi
