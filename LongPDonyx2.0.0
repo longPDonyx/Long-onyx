@@ -1,0 +1,394 @@
+-- ================================================
+-- LONGPD ONYX HUB v6.6 - BRING MOB & REDZ FAST ATTACK
+-- Red UI | Customizable Bring Mob | Anti-Fly | Full Quests
+-- ================================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- Global Toggles & Configs
+_G.AutoFarmLevel = false
+_G.FastAttack = true
+_G.AttackRange = 60
+_G.FlySpeed = 190
+
+-- Bring Mob Configs
+_G.BringMob = true
+_G.BringMobSpeed = 50 -- Khoảng thời gian delay kéo (càng thấp càng nhanh)
+_G.MaxBringMobs = 3    -- Số lượng quái gom tối đa cùng lúc
+
+_G.AutoZouSea2 = false
+_G.AutoZouSea3 = false
+_G.AutoDoughKing = false
+_G.AutoCakePrince = false
+_G.AutoRipIndra = false
+_G.AutoEliteHunter = false
+
+_G.AutoSaber = false
+_G.AutoDragonTrident = false
+_G.AutoRengoku = false
+_G.AutoCavander = false
+
+_G.AutoTerrorshark = false
+_G.AutoSeaBeast = false
+_G.AutoLeviathan = false
+_G.AutoDragonBoss = false
+_G.AutoDragonHearts = false
+
+-- Helper Functions
+local function GetCommF()
+    return ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+        or ReplicatedStorage:FindFirstChild("Net") and ReplicatedStorage.Net:FindFirstChild("CommF_")
+end
+
+local function GetCurrentSea()
+    local pId = game.PlaceId
+    if pId == 2753915549 then return 1
+    elseif pId == 4442272183 then return 2
+    elseif pId == 7449423635 then return 3 end
+    return 1
+end
+
+local function GetPlayerLevel()
+    local d = LocalPlayer:FindFirstChild("Data")
+    return d and d:FindFirstChild("Level") and d.Level.Value or 1
+end
+
+-- ================================================
+-- SYSTEM: ANTI-FLY KICK & STABLE TWEEN
+-- ================================================
+local currentTween = nil
+local function SafeTo(targetCFrame)
+    pcall(function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = char.HumanoidRootPart
+        local dist = (hrp.Position - targetCFrame.Position).Magnitude
+
+        hrp.Velocity = Vector3.zero
+
+        if dist < 15 then
+            if currentTween then currentTween:Cancel() end
+            hrp.CFrame = targetCFrame
+            return
+        end
+
+        local timeToTravel = dist / _G.FlySpeed
+        local tweenInfo = TweenInfo.new(timeToTravel, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+
+        if currentTween then currentTween:Cancel() end
+        currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+        currentTween:Play()
+    end)
+end
+
+RunService.Stepped:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char and _G.AutoFarmLevel then
+            for _, v in pairs(char:GetChildren()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+            if char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.Velocity = Vector3.zero
+            end
+        end
+    end)
+end)
+
+-- NÚT TẮT/MỞ MENU MÀU TÍM
+local ToggleGui = Instance.new("ScreenGui", game:GetService("CoreGui") or LocalPlayer.PlayerGui)
+local ToggleButton = Instance.new("TextButton", ToggleGui)
+local UICorner = Instance.new("UICorner", ToggleButton)
+
+ToggleGui.Name = "OnyxHubToggle"
+ToggleButton.Name = "ToggleButton"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(130, 0, 220)
+ToggleButton.Position = UDim2.new(0.015, 0, 0.15, 0)
+ToggleButton.Size = UDim2.new(0, 160, 0, 35)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "LONGPD ONYX HUB"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 14
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+UICorner.CornerRadius = UDim.new(0, 8)
+
+-- KHỞI TẠO RED UI
+local Window = Fluent:CreateWindow({
+    Title = "LONGPD ONYX HUB | RED EDITION",
+    SubTitle = "Custom Bring Mob & Redz Fast Attack",
+    TabWidth = 150,
+    Size = UDim2.fromOffset(620, 500),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+ToggleButton.MouseButton1Click:Connect(function()
+    VirtualUser:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+end)
+
+-- TABS MENU
+local Tabs = {
+    Status = Window:AddTab({ Title = "Status", Icon = "activity" }),
+    Main = Window:AddTab({ Title = "Main Farm", Icon = "home" }),
+    SeaQuest = Window:AddTab({ Title = "Zou Quests", Icon = "compass" }),
+    Bosses = Window:AddTab({ Title = "Bosses", Icon = "swords" }),
+    Items = Window:AddTab({ Title = "Items & Swords", Icon = "shield" }),
+    SeaEvent = Window:AddTab({ Title = "Sea Events", Icon = "waves" }),
+    DragonEvent = Window:AddTab({ Title = "Dragon Event", Icon = "flame" }),
+    Shop = Window:AddTab({ Title = "Shop Center", Icon = "shopping-cart" })
+}
+
+-- TAB 1: STATUS TRACKER
+local StatusBones = Tabs.Status:AddParagraph({ Title = "Bones Count", Content = "Checking..." })
+local StatusCake = Tabs.Status:AddParagraph({ Title = "Cake Prince Status", Content = "Checking..." })
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            local bone = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Bones") and LocalPlayer.Data.Bones.Value or 0
+            StatusBones:SetDesc("Total Bones: " .. tostring(bone))
+
+            local cake = ReplicatedStorage:FindFirstChild("CakePrinceKills") and ReplicatedStorage.CakePrinceKills.Value or 0
+            StatusCake:SetDesc("Kills Remaining: " .. tostring(500 - cake) .. " (" .. tostring(cake) .. "/500)")
+        end)
+    end
+end)
+
+-- TAB 2: MAIN FARM (THÊM CÁC TÙY CHỌN BRING MOB VÀO ĐÂY)
+Tabs.Main:AddToggle("AutoFarmLevelToggle", { Title = "Auto Farm Level (Max 2800)", Default = false, Callback = function(v) _G.AutoFarmLevel = v end })
+Tabs.Main:AddToggle("FastAttackToggle", { Title = "Enable Redz Fast Attack", Default = true, Callback = function(v) _G.FastAttack = v end })
+
+Tabs.Main:AddSection("Bring Mob Settings")
+Tabs.Main:AddToggle("BringMobToggle", { Title = "Enable Bring Mob (Gom Quái)", Default = true, Callback = function(v) _G.BringMob = v end })
+Tabs.Main:AddSlider("BringMobSpeedSlider", {
+    Title = "Bring Mob Speed Delay (ms)",
+    Description = "Càng nhỏ kéo quái càng nhanh (Mặc định: 50ms)",
+    Default = 50, Min = 10, Max = 200, Sub = 5,
+    Callback = function(v) _G.BringMobSpeed = v end
+})
+Tabs.Main:AddSlider("MaxMobsSlider", {
+    Title = "Max Bring Mobs Count",
+    Description = "Số lượng quái gom tối đa cùng lúc",
+    Default = 3, Min = 1, Max = 6, Sub = 1,
+    Callback = function(v) _G.MaxBringMobs = v end
+})
+
+-- TAB 3: ZOU QUESTS
+Tabs.SeaQuest:AddToggle("AutoZouSea2", { Title = "Auto Zou Quest (Sea 2)", Default = false, Callback = function(v) _G.AutoZouSea2 = v end })
+Tabs.SeaQuest:AddToggle("AutoZouSea3", { Title = "Auto Zou Quest (Sea 3)", Default = false, Callback = function(v) _G.AutoZouSea3 = v end })
+
+-- TAB 4: BOSSES
+Tabs.Bosses:AddToggle("DoughKing", { Title = "Auto Dough King", Default = false, Callback = function(v) _G.AutoDoughKing = v end })
+Tabs.Bosses:AddToggle("CakePrince", { Title = "Auto Cake Prince", Default = false, Callback = function(v) _G.AutoCakePrince = v end })
+Tabs.Bosses:AddToggle("RipIndra", { Title = "Auto Rip Indra", Default = false, Callback = function(v) _G.AutoRipIndra = v end })
+Tabs.Bosses:AddToggle("EliteHunter", { Title = "Auto Elite Hunter", Default = false, Callback = function(v) _G.AutoEliteHunter = v end })
+
+-- TAB 5: ITEMS & SWORDS
+Tabs.Items:AddToggle("Saber", { Title = "Auto Get Saber (Sea 1)", Default = false, Callback = function(v) _G.AutoSaber = v end })
+Tabs.Items:AddToggle("DragonTrident", { Title = "Auto Get Dragon Trident (Sea 1)", Default = false, Callback = function(v) _G.AutoDragonTrident = v end })
+Tabs.Items:AddToggle("Rengoku", { Title = "Auto Get Rengoku (Sea 2)", Default = false, Callback = function(v) _G.AutoRengoku = v end })
+Tabs.Items:AddToggle("Cavander", { Title = "Auto Get Cavander (Sea 3)", Default = false, Callback = function(v) _G.AutoCavander = v end })
+
+-- TAB 6: SEA EVENTS
+Tabs.SeaEvent:AddToggle("Terrorshark", { Title = "Auto Terrorshark Hunt", Default = false, Callback = function(v) _G.AutoTerrorshark = v end })
+Tabs.SeaEvent:AddToggle("SeaBeast", { Title = "Auto Sea Beast Hunt", Default = false, Callback = function(v) _G.AutoSeaBeast = v end })
+Tabs.SeaEvent:AddToggle("Leviathan", { Title = "Auto Leviathan Hunt", Default = false, Callback = function(v) _G.AutoLeviathan = v end })
+
+-- TAB 7: DRAGON EVENT
+Tabs.DragonEvent:AddToggle("DragonBoss", { Title = "Auto Dragon Boss", Default = false, Callback = function(v) _G.AutoDragonBoss = v end })
+Tabs.DragonEvent:AddToggle("DragonHearts", { Title = "Auto Collect Dragon Hearts", Default = false, Callback = function(v) _G.AutoDragonHearts = v end })
+
+-- TAB 8: SHOP CENTER
+local CommF = GetCommF()
+Tabs.Shop:AddSection("Stat & Race")
+Tabs.Shop:AddButton({ Title = "Reset Stats (2,500 Frags)", Callback = function() if CommF then CommF:InvokeServer("BlackbeardReward", "Refund", "1") end end })
+Tabs.Shop:AddButton({ Title = "Reroll Race (3,000 Frags)", Callback = function() if CommF then CommF:InvokeServer("BlackbeardReward", "Reroll", "1") end end })
+
+Tabs.Shop:AddSection("Fighting Styles")
+Tabs.Shop:AddButton({ Title = "Buy Dark Step ($150,000)", Callback = function() if CommF then CommF:InvokeServer("BuyBlackLeg") end end })
+Tabs.Shop:AddButton({ Title = "Buy Electro ($500,000)", Callback = function() if CommF then CommF:InvokeServer("BuyElectro") end end })
+Tabs.Shop:AddButton({ Title = "Buy Fishman Karate ($750,000)", Callback = function() if CommF then CommF:InvokeServer("BuyFishmanKarate") end end })
+Tabs.Shop:AddButton({ Title = "Buy Superhuman ($3,000,000)", Callback = function() if CommF then CommF:InvokeServer("BuySuperhuman") end end })
+
+-- ================================================
+-- DỮ LIỆU QUEST CHÍNH XÁC (SEA 1 - 3)
+-- ================================================
+local function GetQuestData()
+    local lvl = GetPlayerLevel()
+    local currentSea = GetCurrentSea()
+    
+    if currentSea == 1 then
+        if lvl >= 700 then return "FountainQuest", 2, "Galley Captain", CFrame.new(5120, 40, 4050), CFrame.new(5650, 40, 4950) end
+        if lvl < 10 then return "BanditQuest1", 1, "Bandit", CFrame.new(1059, 16, 1548), CFrame.new(1145, 17, 1634)
+        elseif lvl < 15 then return "JungleQuest", 1, "Monkey", CFrame.new(-1600, 36, 153), CFrame.new(-1620, 22, 140)
+        elseif lvl < 30 then return "JungleQuest", 2, "Gorilla", CFrame.new(-1600, 36, 153), CFrame.new(-1240, 6, -500)
+        elseif lvl < 60 then return "BuggyQuest1", 1, "Pirate", CFrame.new(-1140, 4, 3828), CFrame.new(-1215, 4, 3910)
+        elseif lvl < 90 then return "DesertQuest", 1, "Desert Bandit", CFrame.new(897, 6, 4388), CFrame.new(930, 6, 4480)
+        elseif lvl < 120 then return "SnowQuest", 1, "Snow Bandit", CFrame.new(1385, 87, -1298), CFrame.new(1280, 105, -1380)
+        elseif lvl < 150 then return "MarineQuest2", 1, "Chief Petty Officer", CFrame.new(-5030, 29, 4325), CFrame.new(-4800, 21, 4260)
+        elseif lvl < 190 then return "SkyQuest", 1, "Sky Bandit", CFrame.new(-4840, 718, -2620), CFrame.new(-4980, 718, -2830)
+        elseif lvl < 275 then return "PrisonerQuest", 1, "Prisoner", CFrame.new(530, 2, 475), CFrame.new(480, 3, 580)
+        elseif lvl < 325 then return "ColosseumQuest", 1, "Toga Warrior", CFrame.new(-1580, 7, 2980), CFrame.new(-1800, 50, 2750)
+        elseif lvl < 400 then return "MagmaQuest", 1, "Military Soldier", CFrame.new(-5310, 12, 8515), CFrame.new(-5400, 60, 8550)
+        elseif lvl < 475 then return "FishmanQuest", 1, "Fishman Warrior", CFrame.new(61120, 18, 1560), CFrame.new(60800, 18, 1500)
+        elseif lvl < 625 then return "SkyExp1Quest", 1, "God's Guard", CFrame.new(-4720, 845, -1950), CFrame.new(-4700, 845, -1900)
+        else return "FountainQuest", 1, "Galley Pirate", CFrame.new(5120, 40, 4050), CFrame.new(5580, 40, 3980) end
+
+    elseif currentSea == 2 then
+        if lvl >= 1500 then return "ForgottenQuest", 1, "Sea Soldier", CFrame.new(-3055, 240, -10145), CFrame.new(-3000, 240, -10300) end
+        if lvl < 775 then return "Area1Quest", 1, "Raider", CFrame.new(-425, 73, 1835), CFrame.new(-750, 73, 2400)
+        elseif lvl < 875 then return "Area2Quest", 1, "Swan Pirate", CFrame.new(635, 73, 915), CFrame.new(880, 120, 1220)
+        elseif lvl < 950 then return "MarineKingdomQuest", 1, "Marine Lieutenant", CFrame.new(-2440, 73, -3215), CFrame.new(-2800, 73, -3000)
+        elseif lvl < 1100 then return "ZombieQuest", 1, "Zombie", CFrame.new(-5495, 48, -795), CFrame.new(-5600, 48, -950)
+        elseif lvl < 1200 then return "SnowMountainQuest", 1, "Snow Trooper", CFrame.new(605, 400, -5370), CFrame.new(500, 400, -5500)
+        elseif lvl < 1300 then return "IceSideQuest", 1, "Lab Subordinate", CFrame.new(-6060, 16, -4905), CFrame.new(-5750, 16, -4500)
+        elseif lvl < 1425 then return "ShipQuest1", 1, "Ship Deckhand", CFrame.new(1030, 125, 32910), CFrame.new(1200, 125, 33000)
+        else return "FrostQuest", 1, "Arctic Warrior", CFrame.new(5660, 28, -6480), CFrame.new(6000, 28, -6200) end
+
+    elseif currentSea == 3 then
+        if lvl < 1600 then return "PiratePortQuest", 1, "Pirate Millionaire", CFrame.new(-290, 44, 5580), CFrame.new(-300, 44, 5300)
+        elseif lvl < 1700 then return "AmazonQuest", 1, "Female Islander", CFrame.new(5830, 52, -1105), CFrame.new(5700, 52, -900)
+        elseif lvl < 1800 then return "MarineTreeQuest", 1, "Marine Commodore", CFrame.new(2180, 29, -6740), CFrame.new(2400, 29, -6800)
+        elseif lvl < 1900 then return "DeepForestIslandQuest", 1, "Fishman Raider", CFrame.new(-13230, 332, -7625), CFrame.new(-13000, 332, -8000)
+        elseif lvl < 2000 then return "HauntedQuest1", 1, "Reborn Skeleton", CFrame.new(-9480, 142, 5520), CFrame.new(-8800, 142, 5600)
+        elseif lvl < 2100 then return "NutsIslandQuest", 1, "Peanut Scout", CFrame.new(-2100, 37, -10200), CFrame.new(-2000, 37, -10000)
+        elseif lvl < 2200 then return "IceCreamIslandQuest", 1, "Ice Cream Chef", CFrame.new(-820, 65, -10965), CFrame.new(-600, 65, -11000)
+        elseif lvl < 2400 then return "CakeQuest1", 1, "Cookie Crafter", CFrame.new(-2020, 37, -12025), CFrame.new(-2300, 37, -12000)
+        elseif lvl < 2525 then return "TikiQuest1", 1, "Isle Outlaw", CFrame.new(-16535, 55, -1725), CFrame.new(-16300, 55, -1800)
+        elseif lvl < 2650 then return "TikiQuest2", 1, "Sun-kissed Warrior", CFrame.new(-16535, 55, -1725), CFrame.new(-16800, 55, -1500)
+        else return "TikiQuest2", 2, "Isle Champion", CFrame.new(-16535, 55, -1725), CFrame.new(-17000, 55, -1700) end
+    end
+    return nil
+end
+
+local function HasQuest()
+    local mainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
+    if mainUI then
+        local questUI = mainUI:FindFirstChild("Quest")
+        return questUI and questUI.Visible
+    end
+    return false
+end
+
+-- ================================================
+-- SYSTEM: ADVANCED BRING MOB ENGINE
+-- ================================================
+task.spawn(function()
+    while true do
+        local delayTime = (_G.BringMobSpeed or 50) / 1000
+        task.wait(delayTime)
+        
+        if _G.AutoFarmLevel and _G.BringMob then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                
+                local myPos = char.HumanoidRootPart.Position
+                local _, _, mName = GetQuestData()
+                local count = 0
+                
+                if mName and Workspace:FindFirstChild("Enemies") then
+                    for _, mob in pairs(Workspace.Enemies:GetChildren()) do
+                        if mob.Name == mName and mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+                            if (mob.HumanoidRootPart.Position - myPos).Magnitude <= 300 then
+                                if count < (_G.MaxBringMobs or 3) then
+                                    mob.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5)
+                                    mob.HumanoidRootPart.Size = Vector3.new(40, 40, 40)
+                                    mob.HumanoidRootPart.CanCollide = false
+                                    mob.Humanoid.WalkSpeed = 0
+                                    count = count + 1
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ================================================
+-- FAST ATTACK AUTO-DAMAGE ENGINE (REDZ HUB STYLE)
+-- ================================================
+local function GetAttackNet()
+    if ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("Net") then
+        return ReplicatedStorage.Modules.Net
+    end
+    return nil
+end
+
+local function GetEnemiesInRange()
+    local targets = {}
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return targets end
+
+    local myPos = char.HumanoidRootPart.Position
+
+    if Workspace:FindFirstChild("Enemies") then
+        for _, mob in pairs(Workspace.Enemies:GetChildren()) do
+            local hrp = mob:FindFirstChild("HumanoidRootPart")
+            local hum = mob:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                if (hrp.Position - myPos).Magnitude <= _G.AttackRange then
+                    table.insert(targets, hrp)
+                end
+            end
+        end
+    end
+    return targets
+end
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if _G.FastAttack then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+
+                local weapon = char:FindFirstChildOfClass("Tool")
+                if weapon and (weapon.ToolTip == "Melee" or weapon.ToolTip == "Sword" or weapon.ToolTip == "Blox Fruit") then
+                    local targets = GetEnemiesInRange()
+                    if #targets > 0 then
+                        local net = GetAttackNet()
+                        if net and net:FindFirstChild("RE/RegisterAttack") then
+                            net["RE/RegisterAttack"]:FireServer(0.001)
+                        end
+                        if net and net:FindFirstChild("RE/RegisterHit") then
+                            for _, targetHrp in pairs(targets) do
+                                net["RE/RegisterHit"]:FireServer(targetHrp, {})
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- VÒNG LẶP CHÍNH AUTO FARM LEVEL
+task.spawn(function()
+    while task.wait(0.1) do
+        pcall(function()
+            local CommF = GetCommF()
+            if _G.AutoFarmLevel and CommF then
+                local qName, qNum, mName, npcCFrame, mobCFrame = GetQuestData()
+                if qName then
+                    if not HasQuest() then
+                        SafeTo(npcCFrame)
+                        if (LocalPlayer.Character.HumanoidRootPart.Position - npcCFrame.Position).Magnitude < 12 then
+                            CommF:InvokeServer("StartQuest", qName, qNum)
+                        end
+                    else
+                        local char = LocalPlayer.Character
+                        if char and no
